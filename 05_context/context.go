@@ -3,6 +3,7 @@ package my_context
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -34,11 +35,16 @@ func ContextChainedCancel() {
 
 	ctx1, _ := context.WithCancel(ctx)
 
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				fmt.Println("job1 canceled")
+				wg.Done()
 				return
 			default:
 				fmt.Println("job1 still working")
@@ -51,6 +57,7 @@ func ContextChainedCancel() {
 			select {
 			case <-ctx1.Done():
 				fmt.Println("job2 canceled")
+				wg.Done()
 				return
 			default:
 				fmt.Println("job2 still working")
@@ -60,8 +67,9 @@ func ContextChainedCancel() {
 	}()
 
 	time.Sleep(time.Second * 2)
-	// 3秒的时候取消
+	// 3秒后再取消
 	cancel()
-	time.Sleep(time.Second * 1)
+
+	wg.Wait()
 	fmt.Println("done")
 }
