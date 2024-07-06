@@ -1,6 +1,7 @@
 package comprehensiveexercise
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -61,13 +62,32 @@ func (h *Manager) GetHouseInfo(id int) (*House, error) {
 }
 
 func (h *Manager) getBasicInfo(id int, resCh chan Response, wg *sync.WaitGroup) {
-	time.Sleep(time.Second * 2) // 模拟请求2s
-	fmt.Sprintln("get basic info success, id=$d", id)
-	resCh <- Response{
-		data: map[string]any{KeyBasicInfo: []string{"1号恒大楼盘", "2单元", "3楼"}},
-		err:  nil,
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	basicResCh := make(chan []string)
+	go func(basicResCh chan []string) {
+		time.Sleep(time.Second * 1) // 模拟请求1s
+		fmt.Sprintln("get basic info success, id=$d", id)
+
+		basicResCh <- []string{"1号恒大楼盘", "2单元", "3楼"}
+	}(basicResCh)
+
+	select {
+	case <-ctx.Done():
+		fmt.Sprintln("get basic info timeout")
+		resCh <- Response{
+			data: map[string]any{},
+			err:  fmt.Errorf("get basic info timeout, id=%d", id),
+		}
+		wg.Done()
+	case res := <-basicResCh:
+		resCh <- Response{
+			data: map[string]any{KeyBasicInfo: res},
+			err:  nil,
+		}
+		wg.Done()
 	}
-	wg.Done()
 }
 
 func (h *Manager) getPriceHistory(id int, resCh chan Response, wg *sync.WaitGroup) {
